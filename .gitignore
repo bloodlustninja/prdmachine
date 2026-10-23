@@ -1,0 +1,19 @@
+﻿# Secrets & Environment
+.env
+*.env
+
+# Dependencies
+node_modules/
+dist/
+build/
+
+# Python virtual environment & cache
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# OS & Editor files
+.vscode/
+.idea/
+.DS_Store
