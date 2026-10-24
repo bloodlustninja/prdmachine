@@ -28,7 +28,7 @@ async def stream_rfc(
     rounds: int = Query(default=1, ge=1, le=3),
     constraint: Optional[str] = Query(default=None),
     api_key: Optional[str] = Query(default=None),
-    model: Optional[str] = Query(default="gemini-2.5-flash-lite")
+    model: Optional[str] = Query(default="gemini-3.5-flash-lite")
 ):
     async def event_generator():
         try:
@@ -56,3 +56,4 @@ async def stream_rfc(
             "Connection": "keep-alive"
         }
     )
+
