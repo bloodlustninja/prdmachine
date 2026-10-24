@@ -1,25 +1,35 @@
 ﻿import os
 import time
-from typing import Generator
+from typing import Generator, Optional, List
 from google import genai
 from google.genai.errors import ClientError, ServerError
 from dotenv import load_dotenv
 
 load_dotenv()
 
-FALLBACK_MODELS = [
-    "gemini-flash-latest",
+DEFAULT_FALLBACK_MODELS = [
     "gemini-2.5-flash-lite",
-    "gemini-3.5-flash-lite",
+    "gemini-flash-latest",
     "gemini-pro-latest",
 ]
 
-def get_gemini_client() -> genai.Client:
-    return genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+def get_gemini_client(api_key: Optional[str] = None) -> genai.Client:
+    key = api_key or os.getenv("GEMINI_API_KEY")
+    if not key:
+        raise ValueError("Missing Gemini API Key. Provide it in the request or set GEMINI_API_KEY.")
+    return genai.Client(api_key=key)
 
-def stream_content_with_fallback(client: genai.Client, prompt: str) -> Generator[str, None, None]:
-    """Streams content using stable verified models with graceful fallback."""
-    for model_name in FALLBACK_MODELS:
+def stream_content_with_fallback(
+    client: genai.Client, prompt: str, preferred_model: Optional[str] = None
+) -> Generator[str, None, None]:
+    model_queue: List[str] = []
+    if preferred_model and preferred_model.strip():
+        model_queue.append(preferred_model.strip())
+    for m in DEFAULT_FALLBACK_MODELS:
+        if m not in model_queue:
+            model_queue.append(m)
+
+    for model_name in model_queue:
         try:
             print(f"[LLM] Attempting stream with model: {model_name}")
             response = client.models.generate_content_stream(

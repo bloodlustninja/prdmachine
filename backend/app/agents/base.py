@@ -1,5 +1,6 @@
 ﻿from abc import ABC, abstractmethod
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
+from google import genai
 from app.schemas import StreamChunk
 
 class BaseAgent(ABC):
@@ -9,6 +10,6 @@ class BaseAgent(ABC):
 
     @abstractmethod
     async def process_turn(
-        self, prompt: str, current_spec: str, current_mermaid: str, round_idx: int
+        self, prompt: str, current_spec: str, current_mermaid: str, round_idx: int, client: genai.Client, model: Optional[str] = None
     ) -> AsyncGenerator[StreamChunk, None]:
         pass

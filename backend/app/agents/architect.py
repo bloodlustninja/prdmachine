@@ -1,34 +1,54 @@
 ﻿import re
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
+from google import genai
 from app.agents.base import BaseAgent
 from app.schemas import AgentRole, StreamChunk, StreamEventType
-from app.gemini_client import get_gemini_client, stream_content_with_fallback
+from app.gemini_client import stream_content_with_fallback
 
 class ArchitectAgent(BaseAgent):
     def __init__(self):
         super().__init__(name="Aegis", role=AgentRole.ARCHITECT.value)
-        self.client = get_gemini_client()
 
     async def process_turn(
-        self, prompt: str, current_spec: str, current_mermaid: str, round_idx: int
+        self, prompt: str, current_spec: str, current_mermaid: str, round_idx: int, client: genai.Client, model: Optional[str] = None
     ) -> AsyncGenerator[StreamChunk, None]:
         yield StreamChunk(event=StreamEventType.AGENT_START, agent=AgentRole.ARCHITECT, round_index=round_idx)
 
-        system_instruction = (
-            "You are Aegis, a Principal System Architect. Given a software idea, draft the baseline "
-            "Technical Design Document (RFC) in clean GitHub-flavored Markdown.\n"
-            "Include:\n"
-            "## 1. System Overview\n"
-            "### 1.1 Core Architecture Components\n"
-            "### 1.2 Data Flow & Storage Model\n\n"
-            "CRITICAL: You MUST include a valid, clean Mermaid.js flowchart enclosed in ```mermaid ... ``` blocks "
-            "illustrating the primary components, databases, and network gateways."
-        )
-
-        full_prompt = f"{system_instruction}\n\nUser Idea: {prompt}"
+        if round_idx == 1:
+            instruction = (
+                "You are Aegis, a seasoned Principal Systems Architect. Draft a rigorous, production-grade Technical RFC.\n"
+                "Adopt an authoritative, precise engineering tone.\n\n"
+                "Structure your output strictly with the following sections:\n"
+                "# RFC: System Architecture Specification\n"
+                "## 1. Executive Summary & Core Requirements\n"
+                "- Primary Functional Requirements\n"
+                "- Non-Functional Targets (Latency SLOs, P99 guarantees, expected throughput)\n"
+                "## 2. Component Topology & Data Flow\n"
+                "Explain the end-to-end data pathway, storage layer choices (SQL vs NoSQL vs In-Memory), and state coordination.\n\n"
+                "CRITICAL: Enclose a clean, valid Mermaid flowchart illustrating all ingestion gates, services, queues, and datastores:\n"
+                "```mermaid\n"
+                "graph TD\n"
+                "...\n"
+                "```\n"
+            )
+            full_prompt = f"{instruction}\n\nProject Scope:\n{prompt}"
+        else:
+            instruction = (
+                f"You are Aegis, Principal Systems Architect. This is Round {round_idx} of debate.\n"
+                "Review the previous critique provided by Vortex (Chaos) and Sentinel (Security).\n"
+                "Add a revision section titled:\n"
+                f"## 4. Architect Revision & Mitigation Synthesis (Round {round_idx})\n"
+                "- Formulate direct design adjustments addressing identified race conditions and auth vulnerabilities.\n"
+                "- Clarify tradeoffs made between consistency (CAP theorem) and developer velocity."
+            )
+            full_prompt = (
+                f"{instruction}\n\n"
+                f"Original Scope: {prompt}\n\n"
+                f"Current Working RFC Draft:\n{current_spec}"
+            )
 
         full_response = ""
-        for token in stream_content_with_fallback(self.client, full_prompt):
+        for token in stream_content_with_fallback(client, full_prompt, preferred_model=model):
             full_response += token
             yield StreamChunk(
                 event=StreamEventType.SPEC_DELTA,

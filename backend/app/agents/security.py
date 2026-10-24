@@ -1,34 +1,40 @@
 ﻿import re
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
+from google import genai
 from app.agents.base import BaseAgent
 from app.schemas import AgentRole, StreamChunk, StreamEventType
-from app.gemini_client import get_gemini_client, stream_content_with_fallback
+from app.gemini_client import stream_content_with_fallback
 
 class SecurityAgent(BaseAgent):
     def __init__(self):
         super().__init__(name="Sentinel", role=AgentRole.SECURITY.value)
-        self.client = get_gemini_client()
 
     async def process_turn(
-        self, prompt: str, current_spec: str, current_mermaid: str, round_idx: int
+        self, prompt: str, current_spec: str, current_mermaid: str, round_idx: int, client: genai.Client, model: Optional[str] = None
     ) -> AsyncGenerator[StreamChunk, None]:
         yield StreamChunk(event=StreamEventType.AGENT_START, agent=AgentRole.SECURITY, round_index=round_idx)
 
-        system_instruction = (
-            "You are Sentinel, Principal Security & Threat Modeling Agent. Review the spec and architecture topology.\n"
-            "1. Output a section titled '## 3. Threat Model & Security Controls' detailing token lifecycle, auth boundaries, encryption, and zero-trust perimeter.\n"
-            "2. Produce an UPDATED, hardened ```mermaid ... ``` diagram that injects required auth guards, firewalls, and encryption boundaries."
+        instruction = (
+            f"You are Sentinel, Principal Security Architect and Threat Modeler (Round {round_idx}).\n"
+            "Perform an uncompromising zero-trust evaluation of the system topology.\n\n"
+            "Produce:\n"
+            f"## 3. Threat Model & Zero-Trust Security Controls (Round {round_idx})\n"
+            "1. **STRIDE Assessment Matrix:** Tabulate Threat, Impacted Component, and Countermeasure.\n"
+            "2. **Identity & Auth Boundary:** Token lifecycle, mTLS mesh enforcement, and secret rotation.\n"
+            "3. **Data Boundary & Regulatory Compliance:** Encryption at rest/transit and audit access trails.\n\n"
+            "MANDATORY: Output an UPDATED, hardened Mermaid diagram enclosed in ```mermaid ... ``` blocks.\n"
+            "Inject WAF, API Gateway rate limiters, auth middleware, and segmented VPC subnets into the topology."
         )
 
         full_prompt = (
-            f"{system_instruction}\n\n"
-            f"Product Idea: {prompt}\n\n"
-            f"Current RFC Spec:\n{current_spec}\n\n"
-            f"Current Topology:\n{current_mermaid}"
+            f"{instruction}\n\n"
+            f"System Concept: {prompt}\n\n"
+            f"Current RFC Body:\n{current_spec}\n\n"
+            f"Existing Topology Diagram:\n{current_mermaid}"
         )
 
         full_response = ""
-        for token in stream_content_with_fallback(self.client, full_prompt):
+        for token in stream_content_with_fallback(client, full_prompt, preferred_model=model):
             full_response += token
             yield StreamChunk(
                 event=StreamEventType.SPEC_DELTA,
