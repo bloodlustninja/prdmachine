@@ -35,13 +35,24 @@ async def stream_rfc(
             async for chunk in orchestrator.run_pipeline(
                 user_idea=idea, rounds=rounds, constraint=constraint, api_key=api_key, model=model
             ):
-                if hasattr(chunk, "model_dump_json"):
-                    yield chunk.model_dump_json()
-                elif hasattr(chunk, "json"):
-                    yield chunk.json()
-                else:
-                    yield str(chunk)
+                payload_str = chunk.model_dump_json() if hasattr(chunk, "model_dump_json") else chunk.json()
+                yield {
+                    "event": "message",
+                    "data": payload_str
+                }
         except Exception as err:
-            yield f'{{"event": "error", "delta": "{str(err)}"}}'
+            import json
+            yield {
+                "event": "message",
+                "data": json.dumps({"event": "error", "delta": str(err)})
+            }
 
-    return EventSourceResponse(event_generator(), ping=15)
+    return EventSourceResponse(
+        event_generator(),
+        ping=10,
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive"
+        }
+    )
